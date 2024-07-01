@@ -43,6 +43,7 @@ clear_thumbnails() {
 update_system() {
     echo "Updating system..."
     apt-get update
+    apt-get upgrade -y
     
 }
 
