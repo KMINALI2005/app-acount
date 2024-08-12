@@ -1,110 +1,247 @@
-name: "My Application" # The app name.
-package: "com.emxample" # The Java package name for your project. e.g. org.example.yourapp.
-version: "1.0.0" # The version number.
-icon: "assets/icons/icon.png" # A path to the png file to use as the application icon.
+name: All Builds (Linux, macOS, Windows, Android, IPA, APK, AAB)
 
-release: on
-debug: on
-force-build: # Whether the distribution must be compiled from scratch.
+on:
+  # Runs on push to any of the below branches
+  push:
+    branches:
+      - master
+      - main
+  # Runs on pull request events that target one of the below branches
+  pull_request:
+    branches:
+      - master
+      - main
 
-private: "/home/nima/Desktop/python-projects/ffdroid/src/" # The directory containing your project files.
-sdk-dir: "/home/nima/Android/Sdk/cmdline-tools/"
-ndk-dir: "/home/nima/Android/Sdk/ndk/25.2.9519653"
-android-api: 33 # Target API version of your application
-ndk-api: 28 # Minimum supported API version of your application
-# storage-dir: "/home/nima/Desktop/python-projects/ffdroid/build" #  Primary storage directory for downloads and builds (default: ~/.local/share/python-for-android)
+  # Allows you to run this workflow manually from the Actions tab of the repository
+  workflow_dispatch:
 
-arch:
-    - armeabi-v7a
-    - x86_64
-    - arm64-v8a
+env:
+  # https://flet.dev/docs/publish#versioning
+  BUILD_NUMBER: 1
+  BUILD_VERSION: 1.0.0
+  PYTHON_VERSION: 3.12.2
+  FLUTTER_VERSION: 3.22.2
 
-bootstrap: sdl2
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
 
-blacklist-requirements:
-    - kivy
-    - openssl
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-requirements:
-    - flet
-    - plyer
+    - name: Setup Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
 
-enable-androidx: on # Enable AndroidX support library.
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-# no-byte-compile-python: on # Skip byte compile for .py files.
+    - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
 
-dist-name: "mydist"
+    - name: Patch for linux build
+      run: |
+        flutter doctor
+        sudo apt-get update -y
+        sudo apt-get install -y ninja-build libgtk-3-dev
+        flutter doctor
 
-presplash-color: "#8A38FF" # The presplash screen background color, of the form #RRGGBB or a color name red, green, blue etc.
+    - name: Flet Build Linux
+      run: |
+        flutter config --no-analytics 
+        flet build linux --verbose --build-number=$BUILD_NUMBER --build-version=$BUILD_VERSION
 
-orientation: portrait
-# The orientations that the app will display in.
-# (Available options are portrait, landscape, portrait-reverse, landscape-reverse).
-# Since Android ignores android:screenOrientation when in multi-window mode (Which
-# is the default on Android 12+), this option will also set the window orientation
-# hints for the SDL bootstrap. If multiple orientations are given, android:screenOrientation
-# will be set to unspecified.
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4.3.4
+      with:
+        name: linux-build-artifact
+        path: build/linux
+        if-no-files-found: warn
+        overwrite: false
 
-manifest-orientation:
-# The orientation that will be set for the android:screenOrientation attribute
-# of the activity in the AndroidManifest.xml file. If not set, the value will
-# be synthesized from the --orientation option. The full list of valid options
-# is given under android:screenOrientation in the Android documentation.
+  build-macos:
+    runs-on: macos-latest
 
-permission:
-# A permission that needs to be declared into the App AndroidManifest.xml. For multiple
-# permissions, add multiple --permission arguments. --home-app Gives you the option to
-# set your application as a home app (launcher) on your Android device.
-# Note
-# --permission accepts the following syntaxes:
-# --permission (name=android.permission.WRITE_EXTERNAL_STORAGE;maxSdkVersion=18)
-# or --permission android.permission.WRITE_EXTERNAL_STORAGE.
-# The first syntax is used to set additional properties to the permission
-# (android:maxSdkVersion and android:usesPermissionFlags are the only ones supported for now).
-# The second one can be used when there’s no need to add any additional properties.
-# Warning
-# The syntax --permission VIBRATE (only the permission name, without the prefix),
-# is also supported for backward compatibility, but it will be removed in the future.
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-meta-data: # Custom key=value pairs to add in the application metadata.
+    - name: Setup Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
 
-presplash: # A path to the image file to use as a screen while the application is loading.
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-presplash-lottie: # use a lottie (json) file as a presplash animation. If used, this will replace the static presplash image.
+    - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
 
-wakelock: # If the argument is included, the application will prevent the device from sleeping.
+    - name: Flet Build macOS
+      run: |
+        flutter config --no-analytics
+        flet build macos --verbose --build-number=$BUILD_NUMBER --build-version=$BUILD_VERSION
 
-window: # If the argument is included, the application will not cover the Android status bar.
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v4.3.4
+      with:
+        name: macos-build-artifact
+        path: build/macos
+        if-no-files-found: warn
+        overwrite: false
 
-blacklist: # The path to a file containing blacklisted patterns that will be excluded from the final APK. Defaults to ./blacklist.txt.
+  build-windows:
+    runs-on: windows-latest
 
-whitelist: # The path to a file containing whitelisted patterns that will be included in the APK even if also blacklisted.
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-add-jar: # The path to a .jar file to include in the APK. To include multiple jar files, pass this argument multiple times.
+    - name: Setup Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
 
-intent-filters: # A file path containing intent filter xml to be included in AndroidManifest.xml.
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-service: # A service name and the Python script it should run. See Arbitrary service scripts.
+    - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
 
-add-source: # Add a source directory to the app’s Java code.
+    - name: Flet Build Windows
+      run: |
+        flutter config --no-analytics
+        flet build windows --verbose --no-rich-output --build-number=$env:BUILD_NUMBER --build-version=$env:BUILD_VERSION
 
-add-resource: # Put this file or directory in the apk res directory.
+    - name: Upload Windows Artifact
+      uses: actions/upload-artifact@v4.3.4
+      with:
+        name: windows-build-artifact
+        path: build/windows
+        if-no-files-found: warn
+        overwrite: false
 
-recipe-blacklist:
-local-recipes:
+  build-aab:
+    runs-on: macos-latest
 
-activity-class-name:
-service-class-name:
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-java-build-tool: #  The java build tool to use when packaging the APK, defaults to automatically selecting an appropriate tool.
+    - name: Setup Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
 
-add-asset: # Put this in the assets folder in the apk.
-with-debug-symbols: # Will keep debug symbols from `.so` files.
-keystore: # Keystore for JAR signing key, will use jarsigner default if not specified (release build only)
-signkey: # Key alias to sign PARSER_APK. with (release build only)
-keystorepw: # Password for keystore
-signkeypw: # Password for key alias
-require-perfect-match:
-copy-libs:
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-color: "always" # {always,never,auto} Enable or disable color output (default enabled on tty)
+    - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+
+    - name: Flet Build AAB
+      run: |
+        flutter config --no-analytics
+        flet build aab --verbose --build-number=$BUILD_NUMBER --build-version=$BUILD_VERSION
+
+    - name: Upload AAB Artifact
+      uses: actions/upload-artifact@v4.3.4
+      with:
+        name: aab-build-artifact
+        path: build/aab
+        if-no-files-found: warn
+        overwrite: false
+
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+
+    - name: Setup Java JDK
+      uses: actions/setup-java@v4.2.1
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    - name: Flet Build APK
+      run: |
+        flutter config --no-analytics
+        flet build apk --verbose --build-number=$BUILD_NUMBER --build-version=$BUILD_VERSION
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4.3.4
+      with:
+        name: apk-build-artifact
+        path: build/apk
+        if-no-files-found: warn
+        overwrite: false
+
+  build-ipa:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+
+    - name: Flet Build IPA
+      run: |
+        flutter config --no-analytics
+        flet build ipa --verbose --build-number=$BUILD_NUMBER --build-version=$BUILD_VERSION 
+
+    - name: Upload IPA Artifact
+      uses: actions/upload-artifact@v4.3.4
+      with:
+        name: ipa-build-artifact
+        path: build/ipa
+        if-no-files-found: warn
+        overwrite: fals
